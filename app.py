@@ -40,7 +40,11 @@ def api_generate():
 
 @app.route('/api/history', methods=['GET'])
 def api_history():
-    return jsonify(read_history())
+    project = request.args.get('project')
+    history = read_history()
+    if project:
+        history = [h for h in history if (h.get('project') or 'default') == project]
+    return jsonify(history)
 
 
 @app.route('/api/history/clear', methods=['POST'])
@@ -55,6 +59,37 @@ def api_history_delete(index):
     from scriptoria.storage import delete_entry
     delete_entry(index)
     return jsonify({'ok': True})
+
+
+@app.route('/api/history/<int:index>/favorite', methods=['POST'])
+def api_history_favorite(index):
+    from scriptoria.storage import read_history, update_entry
+    history = read_history()
+    if not (0 <= index < len(history)):
+        return jsonify({'error': 'not found'}), 404
+    current = bool(history[index].get('favorite'))
+    update_entry(index, {'favorite': not current})
+    return jsonify({'ok': True, 'favorite': not current})
+
+
+@app.route('/api/history/<int:index>/tags', methods=['POST'])
+def api_history_tags(index):
+    data = request.get_json() or {}
+    tags = data.get('tags', [])
+    if not isinstance(tags, list):
+        return jsonify({'error': 'tags must be a list'}), 400
+    from scriptoria.storage import read_history, update_entry
+    history = read_history()
+    if not (0 <= index < len(history)):
+        return jsonify({'error': 'not found'}), 404
+    update_entry(index, {'tags': tags})
+    return jsonify({'ok': True, 'tags': tags})
+
+
+@app.route('/api/stats', methods=['GET'])
+def api_stats():
+    from scriptoria.storage import stats
+    return jsonify(stats())
 
 
 if __name__ == '__main__':
